@@ -21,8 +21,8 @@ jobs:
 
       - name: Login to ECR
         run: |
-          aws ecr get-login-password \
-          | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO_URI }}
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+          | docker login --username AWS --password-stdin $(echo ${{ secrets.ECR_REPO_URI }} | cut -d'/' -f1)
 
       - name: Build image
         run: docker build -t chatbot ./lambda
