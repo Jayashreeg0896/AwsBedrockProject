@@ -36,4 +36,6 @@ jobs:
 
       - name: Deploy
         run: |
-          aws cloudformation deploy --stack-name ${{ secrets.STACK_NAME }} --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ImageUri=${{ secrets.ECR_REPO_URI }}:${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} SystemState=ACTIVE
+          aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ImageUri=${{ secrets.ECR_REPO_URI }}:${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} SystemState=ACTIVE
+            
+          
