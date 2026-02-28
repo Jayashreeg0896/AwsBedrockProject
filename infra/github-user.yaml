@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: GitHub deployment user
+
+Resources:
+
+  GitHubDeployerUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: github-bedrock-deployer
+
+  GitHubDeployerPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: github-bedrock-deployer-policy
+      Users:
+        - !Ref GitHubDeployerUser
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:CompleteLayerUpload
+              - ecr:UploadLayerPart
+              - ecr:InitiateLayerUpload
+              - ecr:PutImage
+            Resource: "*"
+
+          - Effect: Allow
+            Action:
+              - cloudformation:*
+            Resource: "*"
+
+          - Effect: Allow
+            Action:
+              - lambda:*
+            Resource: "*"
+
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource: "*"
+
+Outputs:
+  UserName:
+    Value: !Ref GitHubDeployerUser
