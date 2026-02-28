@@ -21,8 +21,6 @@ jobs:
 
       - name: Login to ECR
         run: |
-                 - name: Login to ECR
-        run: |
           REGISTRY=$(echo "${{ secrets.ECR_REPO_URI }}" | cut -d'/' -f1)
           PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
           echo "$PASSWORD" | docker login --username AWS --password-stdin $REGISTRY
