@@ -8,6 +8,10 @@ inclusion: always
 
 ```
 /
+├── .github/
+│   └── workflows/
+│       └── deploy.yaml  # GitHub Actions CI/CD pipeline
+│
 ├── lambda/              # Lambda function code
 │   ├── handler.py       # Main Lambda handler with Bedrock integration
 │   └── Dockerfile.dockerfile  # Container definition for Lambda
@@ -32,6 +36,14 @@ inclusion: always
 ### CI/CD
 - Dedicated IAM user (`github-bedrock-deployer`) for GitHub Actions
 - Permissions for ECR push, CloudFormation deployment, Lambda updates, and IAM role passing
+- Automated deployment on push to `main` branch
+- Pipeline: checkout → build Docker image → push to ECR → deploy via CloudFormation
+- Images tagged with Git commit SHA for traceability
+
+### GitHub Actions Workflow
+- Trigger: Push to `main` branch
+- Steps: AWS auth → ECR login → Docker build/tag/push → CloudFormation deploy
+- Required secrets: AWS credentials, ECR URI, Lambda role ARN, stack name, tags
 
 ### Lambda Handler
 - Single handler function in `lambda/handler.py`

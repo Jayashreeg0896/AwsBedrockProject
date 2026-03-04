@@ -9,7 +9,7 @@ def handler(event, context):
         return {"statusCode": 503, "body": "System parked"}
 
     body = json.loads(event.get("body", "{}"))
-    q = body.get("question", "hello")
+    q = body.get("question", "whats your name?")
 
     response = bedrock.converse(
         modelId="anthropic.claude-3-haiku-20240307-v1:0",

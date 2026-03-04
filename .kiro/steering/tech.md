@@ -27,6 +27,17 @@ inclusion: always
 ```bash
 # Initial setup (foundation, ECR, GitHub deployer user)
 ./bootstrap.sh
+
+# After bootstrap, configure GitHub secrets:
+# - AWS_ACCESS_KEY_ID
+# - AWS_SECRET_ACCESS_KEY
+# - AWS_REGION
+# - ECR_REPO_URI
+# - LAMBDA_ROLE_ARN
+# - STACK_NAME
+# - PROJECT
+# - OWNER
+# - ENV
 ```
 
 ### Docker
@@ -57,5 +68,19 @@ aws cloudformation deploy --template-file infra/app.yaml --stack-name bedrock-ap
 ```
 
 ## Configuration
-- Environment variables configured via CloudFormation parameters
+
+### Lambda Environment Variables
 - `SYSTEM_STATE`: Controls hibernation mode (ACTIVE/HIBERNATED)
+- Configured via CloudFormation parameters
+
+### GitHub Actions Secrets
+Required for CI/CD pipeline:
+- `AWS_ACCESS_KEY_ID` - GitHub deployer user access key
+- `AWS_SECRET_ACCESS_KEY` - GitHub deployer user secret key
+- `AWS_REGION` - AWS region for deployment
+- `ECR_REPO_URI` - Full ECR repository URI
+- `LAMBDA_ROLE_ARN` - ARN of Lambda execution role (from foundation stack)
+- `STACK_NAME` - CloudFormation stack name for app (e.g., bedrock-app)
+- `PROJECT` - Project tag value
+- `OWNER` - Owner tag value
+- `ENV` - Environment tag value (dev/prod)
