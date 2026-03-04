@@ -12,7 +12,7 @@ def handler(event, context):
     q = body.get("question", "hello")
 
     r = bedrock.invoke_model(
-        modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+        modelId="anthropic.claude-3-haiku-20240307-v1:0",
         body=json.dumps({
             "messages":[{"role":"user","content":q}],
             "max_tokens":200
