@@ -21,6 +21,13 @@ inclusion: always
 ## Dependencies
 - `boto3` - AWS SDK for Python
 
+## Testing Dependencies
+- `pytest` - Testing framework
+- `hypothesis` - Property-based testing library
+- `pytest-mock` - Mocking support for pytest
+- `pyyaml` - YAML parsing for infrastructure tests
+- `botocore` - AWS SDK core (for exception handling in tests)
+
 ## Common Commands
 
 ### Bootstrap Infrastructure
@@ -84,3 +91,33 @@ Required for CI/CD pipeline:
 - `PROJECT` - Project tag value
 - `OWNER` - Owner tag value
 - `ENV` - Environment tag value (dev/prod)
+
+## Testing
+
+### Run Tests
+```bash
+# Install test dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests (47 tests, 100% pass rate)
+python -m pytest -v
+
+# Run specific test types
+python -m pytest -m unit              # Unit tests
+python -m pytest -m property          # Property-based tests (800+ cases)
+python -m pytest -m infrastructure    # Infrastructure validation
+
+# Generate coverage report
+python -m pytest --cov=lambda --cov-report=html
+```
+
+### Test Categories
+- **Unit Tests** (10 tests): Lambda handler behavior, Bedrock configuration
+- **Property Tests** (8 tests): Universal properties across all inputs (100+ iterations each)
+- **Infrastructure Tests** (29 tests): CloudFormation templates, CI/CD pipeline, bootstrap script
+
+### Key Testing Features
+- Custom CloudFormation YAML loader for intrinsic functions (`!Ref`, `!GetAtt`)
+- Property-based testing with Hypothesis for comprehensive input coverage
+- Static analysis of infrastructure templates and deployment scripts
+- All 27 correctness properties from design document validated

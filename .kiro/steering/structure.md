@@ -22,7 +22,23 @@ inclusion: always
 │   ├── github-user.yaml # IAM user for GitHub Actions deployment
 │   └── app.yaml        # Lambda function deployment
 │
-└── bootstrap.sh         # Initial infrastructure setup script
+├── tests/               # Comprehensive test suite
+│   ├── unit/           # Unit tests for Lambda components
+│   │   ├── test_handler.py
+│   │   └── test_configuration.py
+│   ├── property/       # Property-based tests (100+ iterations each)
+│   │   ├── test_request_properties.py
+│   │   ├── test_response_properties.py
+│   │   └── test_bedrock_properties.py
+│   ├── infrastructure/ # Infrastructure validation tests
+│   │   ├── test_cloudformation.py
+│   │   ├── test_pipeline.py
+│   │   └── cfn_yaml_loader.py
+│   └── README.md       # Test documentation
+│
+├── bootstrap.sh         # Initial infrastructure setup script
+├── requirements-dev.txt # Test dependencies
+└── pytest.ini          # Pytest configuration
 ```
 
 ## Architecture Patterns
@@ -72,3 +88,31 @@ inclusion: always
 ### Error Handling
 - HTTP 503 returned when system is hibernated
 - HTTP 200 for successful responses
+
+## Testing
+
+### Test Coverage
+- **47 tests** validating all 27 correctness properties
+- **Unit tests**: Lambda handler behavior, configuration validation
+- **Property-based tests**: 8 properties with 100+ iterations each (800+ test cases)
+- **Infrastructure tests**: CloudFormation templates, CI/CD pipeline, bootstrap script
+
+### Running Tests
+```bash
+# Install test dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests
+python -m pytest -v
+
+# Run specific test categories
+python -m pytest -m unit              # Unit tests only
+python -m pytest -m property          # Property-based tests only
+python -m pytest -m infrastructure    # Infrastructure tests only
+```
+
+### Test Structure
+- `tests/unit/` - Unit tests for Lambda components
+- `tests/property/` - Property-based tests using Hypothesis
+- `tests/infrastructure/` - CloudFormation and pipeline validation
+- `tests/README.md` - Comprehensive testing documentation
