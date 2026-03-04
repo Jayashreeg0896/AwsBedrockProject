@@ -38,6 +38,9 @@ Resources:
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
+              - aws-marketplace:ViewSubscriptions
+              - aws-marketplace:Subscribe
+              - aws-marketplace:Unsubscribe
             Resource: "*"
 
 Outputs:
