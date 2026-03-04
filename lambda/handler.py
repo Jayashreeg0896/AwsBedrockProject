@@ -11,12 +11,27 @@ def handler(event, context):
     body = json.loads(event.get("body", "{}"))
     q = body.get("question", "hello")
 
-    r = bedrock.invoke_model(
+    response = bedrock.invoke_model(
         modelId="anthropic.claude-3-haiku-20240307-v1:0",
+        contentType="application/json",
+        accept="application/json",
         body=json.dumps({
-            "messages":[{"role":"user","content":q}],
-            "max_tokens":200
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 200,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": q}
+                    ]
+                }
+            ]
         })
     )
 
-    return {"statusCode": 200, "body": r["body"].read().decode()}
+    result = json.loads(response["body"].read())
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(result)
+    }
