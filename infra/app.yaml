@@ -49,6 +49,13 @@ Resources:
       Principal: "*"
       FunctionUrlAuthType: NONE
 
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ChatFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: "*"
+
 Outputs:
   FunctionUrl:
     Value: !GetAtt LambdaFunctionUrl.FunctionUrl
