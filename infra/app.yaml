@@ -37,9 +37,9 @@ Resources:
         AllowOrigins:
           - "*"
         AllowMethods:
-          - POST
+          - "*"
         AllowHeaders:
-          - content-type
+          - "*"
 
   LambdaUrlPermission:
     Type: AWS::Lambda::Permission
