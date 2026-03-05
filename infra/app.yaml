@@ -38,8 +38,11 @@ Resources:
           - "*"
         AllowMethods:
           - POST
+          - OPTIONS
         AllowHeaders:
           - content-type
+          - origin
+        MaxAge: 86400
 
   LambdaUrlPermission:
     Type: AWS::Lambda::Permission
