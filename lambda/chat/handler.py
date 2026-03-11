@@ -33,21 +33,17 @@ def cosine_similarity(a, b):
 
 
 def retrieve_context(question):
-    """Search embeddings in S3 and return top K matching chunks"""
     try:
-        # List all embedding files
         response = s3.list_objects_v2(
             Bucket=DOCUMENTS_BUCKET,
             Prefix=EMBEDDINGS_PREFIX
         )
         if "Contents" not in response:
             print("No embeddings found")
-            return [], []
+            return "", []
 
-        # Embed the question
         question_embedding = embed_text(question)
 
-        # Search all chunks across all documents
         all_chunks = []
         for obj in response["Contents"]:
             key = obj["Key"]
@@ -57,13 +53,11 @@ def retrieve_context(question):
             chunks = json.loads(data["Body"].read())
             all_chunks.extend(chunks)
 
-        # Score each chunk
         scored = []
         for chunk in all_chunks:
             score = cosine_similarity(question_embedding, chunk["embedding"])
             scored.append((score, chunk))
 
-        # Return top K
         scored.sort(key=lambda x: x[0], reverse=True)
         top_chunks = [chunk for _, chunk in scored[:TOP_K]]
         sources = list(set(chunk["source"] for chunk in top_chunks))
@@ -87,15 +81,18 @@ def handler(event, context):
 
     # Build prompt
     if rag_context:
-        prompt = f"""Use the following context from AWS documentation to answer the question.
-If the answer is not in the context, say so and answer from your general knowledge.
+        prompt = f"""You are a helpful, friendly AWS assistant. Answer the user's question in a natural, conversational way.
+Use the context below to inform your answer, but never mention that you are using "context" or "documentation".
+Just answer naturally as if you know the information. If the question is casual like a greeting, respond warmly and naturally.
 
 Context:
 {rag_context}
 
-Question: {q}"""
+User: {q}"""
     else:
-        prompt = q
+        prompt = f"""You are a helpful, friendly AWS assistant. Answer the user's question in a natural, conversational way.
+
+User: {q}"""
 
     # Call Claude
     response = bedrock.converse(
@@ -106,7 +103,7 @@ Question: {q}"""
                 "content": [{"text": prompt}]
             }
         ],
-        inferenceConfig={"maxTokens": 512}
+        inferenceConfig={"maxTokens": 1024}
     )
 
     result = response["output"]["message"]["content"][0]["text"]
