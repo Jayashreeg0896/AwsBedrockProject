@@ -42,8 +42,16 @@ Resources:
               - aws-marketplace:Subscribe
               - aws-marketplace:Unsubscribe
             Resource: "*"
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+              - s3:DeleteObject
+            Resource:
+              - !Sub "arn:aws:s3:::bedrock-rag-documents-${AWS::AccountId}"
+              - !Sub "arn:aws:s3:::bedrock-rag-documents-${AWS::AccountId}/*"
 
 Outputs:
   LambdaRoleArn:
     Value: !GetAtt LambdaRole.Arn
-
