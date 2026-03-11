@@ -1,10 +1,11 @@
 import boto3
 import json
 import os
-import re
+import math
 
 s3 = boto3.client("s3")
 bedrock = boto3.client("bedrock-runtime")
+textract = boto3.client("textract")
 
 BUCKET = os.getenv("DOCUMENTS_BUCKET")
 EMBEDDINGS_PREFIX = "embeddings/"
@@ -13,8 +14,6 @@ CHUNK_OVERLAP = 50
 
 
 def extract_text_from_pdf(bucket, key):
-    """Extract text from PDF using Textract"""
-    textract = boto3.client("textract")
     response = textract.detect_document_text(
         Document={"S3Object": {"Bucket": bucket, "Name": key}}
     )
@@ -27,7 +26,6 @@ def extract_text_from_pdf(bucket, key):
 
 
 def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
-    """Split text into overlapping chunks"""
     words = text.split()
     chunks = []
     start = 0
@@ -40,7 +38,6 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
 
 
 def embed_text(text):
-    """Get embeddings from Titan Embeddings v2"""
     response = bedrock.invoke_model(
         modelId="amazon.titan-embed-text-v2:0",
         contentType="application/json",
@@ -51,15 +48,23 @@ def embed_text(text):
     return result["embedding"]
 
 
+def cosine_similarity(a, b):
+    dot = sum(x * y for x, y in zip(a, b))
+    mag_a = math.sqrt(sum(x ** 2 for x in a))
+    mag_b = math.sqrt(sum(x ** 2 for x in b))
+    if mag_a == 0 or mag_b == 0:
+        return 0
+    return dot / (mag_a * mag_b)
+
+
 def handler(event, context):
-    """Triggered when a PDF is uploaded to S3"""
     for record in event["Records"]:
         bucket = record["s3"]["bucket"]["name"]
         key = record["s3"]["object"]["key"]
 
-        # Only process PDFs
-        if not key.lower().endswith(".pdf"):
-            print(f"Skipping non-PDF file: {key}")
+        # Skip embeddings folder and non-PDFs
+        if key.startswith(EMBEDDINGS_PREFIX) or not key.lower().endswith(".pdf"):
+            print(f"Skipping: {key}")
             continue
 
         print(f"Processing: {key}")
@@ -72,7 +77,7 @@ def handler(event, context):
         chunks = chunk_text(text)
         print(f"Created {len(chunks)} chunks")
 
-        # Embed each chunk and save
+        # Embed each chunk
         embeddings_data = []
         for i, chunk in enumerate(chunks):
             embedding = embed_text(chunk)
@@ -93,6 +98,6 @@ def handler(event, context):
             Body=json.dumps(embeddings_data),
             ContentType="application/json"
         )
-        print(f"Saved embeddings to {embeddings_key}")
+        print(f"Saved embeddings to s3://{BUCKET}/{embeddings_key}")
 
     return {"statusCode": 200, "body": "Ingestion complete"}

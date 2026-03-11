@@ -25,27 +25,29 @@ jobs:
           PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
           echo "$PASSWORD" | docker login --username AWS --password-stdin $REGISTRY
 
-      - name: Build image
-        run: docker build -t chatbot ./lambda
+      - name: Build chat image
+        run: docker build -t chatbot ./lambda/chat
 
-      - name: Tag image
-        run: docker tag chatbot:latest ${{ secrets.ECR_REPO_URI }}:${{ github.sha }}
+      - name: Tag chat image
+        run: docker tag chatbot:latest ${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }}
 
-      - name: Push image
-        run: docker push ${{ secrets.ECR_REPO_URI }}:${{ github.sha }}
+      - name: Push chat image
+        run: docker push ${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }}
 
-      - name: Debug Parameters
-        run: |
-          echo "STACK_NAME=${{ secrets.STACK_NAME }}"
-          echo "ECR_REPO_URI=${{ secrets.ECR_REPO_URI }}"
-          echo "LAMBDA_ROLE_ARN=${{ secrets.LAMBDA_ROLE_ARN }}"
-          echo "PROJECT=${{ secrets.PROJECT }}"
-          echo "OWNER=${{ secrets.OWNER }}"
-          echo "ENV=${{ secrets.ENV }}"
+      - name: Build ingestion image
+        run: docker build -t ingestion ./lambda/ingestion
 
-      - name: Deploy
-        run: |
-          aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ImageUri=${{ secrets.ECR_REPO_URI }}:${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} OwnerTag=Jayashree EnvTag=dev SystemState=HIBERNATED ProjectTag=${{ secrets.PROJECT }}
+      - name: Tag ingestion image
+        run: docker tag ingestion:latest ${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }}
+
+      - name: Push ingestion image
+        run: docker push ${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }}
+
+      - name: Deploy Foundation Stack
+        run: aws cloudformation deploy --stack-name bedrock-foundation --template-file infra/foundation.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }}
+
+      - name: Deploy App Stack
+        run: aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ChatImageUri=${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }} IngestionImageUri=${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} SystemState=ACTIVE ProjectTag=${{ secrets.PROJECT }}
+
       - name: Deploy Knowledge Base Stack
-        run: |
-          aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides OwnerTag=Jayashree EnvTag=dev ProjectTag=${{ secrets.PROJECT }}
+        run: aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} IngestionFunctionArn=$(aws cloudformation describe-stacks --stack-name "${{ secrets.STACK_NAME }}" --query "Stacks[0].Outputs[?OutputKey=='IngestionFunctionArn'].OutputValue" --output text)

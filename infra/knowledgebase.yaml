@@ -4,6 +4,7 @@ Parameters:
   ProjectTag: { Type: String }
   OwnerTag: { Type: String }
   EnvTag: { Type: String }
+  IngestionFunctionArn: { Type: String }
 
 Resources:
 
@@ -11,6 +12,15 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "bedrock-rag-documents-${AWS::AccountId}"
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .pdf
+            Function: !Ref IngestionFunctionArn
       Tags:
         - Key: Project
           Value: !Ref ProjectTag

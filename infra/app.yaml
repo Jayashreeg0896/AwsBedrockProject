@@ -1,7 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 Parameters:
-  ImageUri: { Type: String }
+  ChatImageUri: { Type: String }
+  IngestionImageUri: { Type: String }
   LambdaRoleArn: { Type: String }
   ProjectTag: { Type: String }
   OwnerTag: { Type: String }
@@ -16,10 +17,31 @@ Resources:
       PackageType: Image
       Role: !Ref LambdaRoleArn
       Code:
-        ImageUri: !Ref ImageUri
+        ImageUri: !Ref ChatImageUri
+      Timeout: 60
       Environment:
         Variables:
           SYSTEM_STATE: !Ref SystemState
+          DOCUMENTS_BUCKET: !Sub "bedrock-rag-documents-${AWS::AccountId}"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Environment
+          Value: !Ref EnvTag
+
+  IngestionFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      PackageType: Image
+      Role: !Ref LambdaRoleArn
+      Code:
+        ImageUri: !Ref IngestionImageUri
+      Timeout: 300
+      Environment:
+        Variables:
+          DOCUMENTS_BUCKET: !Sub "bedrock-rag-documents-${AWS::AccountId}"
       Tags:
         - Key: Project
           Value: !Ref ProjectTag
@@ -56,6 +78,16 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: "*"
 
+  S3InvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt IngestionFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub "arn:aws:s3:::bedrock-rag-documents-${AWS::AccountId}"
+
 Outputs:
   FunctionUrl:
     Value: !GetAtt LambdaFunctionUrl.FunctionUrl
+  IngestionFunctionArn:
+    Value: !GetAtt IngestionFunction.Arn
