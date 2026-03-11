@@ -47,7 +47,7 @@ jobs:
         run: aws cloudformation deploy --stack-name bedrock-foundation --template-file infra/foundation.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }}
 
       - name: Deploy App Stack
-        run: aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ChatImageUri=${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }} IngestionImageUri=${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} SystemState=HIBERNATED ProjectTag=${{ secrets.PROJECT }}
+        run: aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides SystemState=HIBERNATED ChatImageUri=${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }} IngestionImageUri=${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} ProjectTag=${{ secrets.PROJECT }}
 
       - name: Deploy Knowledge Base Stack
         run: |
