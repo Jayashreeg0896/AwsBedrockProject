@@ -53,7 +53,8 @@ Resources:
               - !Sub "arn:aws:s3:::bedrock-rag-documents-${AWS::AccountId}/*"
           - Effect: Allow
             Action:
-              - textract:DetectDocumentText
+              - textract:StartDocumentTextDetection
+              - textract:GetDocumentTextDetection
             Resource: "*"
 
 Outputs:

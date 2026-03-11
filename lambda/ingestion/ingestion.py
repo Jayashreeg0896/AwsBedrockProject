@@ -2,6 +2,7 @@ import boto3
 import json
 import os
 import math
+import time
 
 s3 = boto3.client("s3")
 bedrock = boto3.client("bedrock-runtime")
@@ -14,15 +15,46 @@ CHUNK_OVERLAP = 50
 
 
 def extract_text_from_pdf(bucket, key):
-    response = textract.detect_document_text(
-        Document={"S3Object": {"Bucket": bucket, "Name": key}}
+    """Extract text from multi-page PDF using Textract async API"""
+    # Start async job
+    response = textract.start_document_text_detection(
+        DocumentLocation={"S3Object": {"Bucket": bucket, "Name": key}}
     )
-    text = " ".join(
-        block["Text"]
-        for block in response["Blocks"]
-        if block["BlockType"] == "LINE"
-    )
-    return text
+    job_id = response["JobId"]
+    print(f"Textract job started: {job_id}")
+
+    # Poll until complete
+    while True:
+        result = textract.get_document_text_detection(JobId=job_id)
+        status = result["JobStatus"]
+        print(f"Textract status: {status}")
+        if status == "SUCCEEDED":
+            break
+        elif status == "FAILED":
+            raise Exception(f"Textract job failed: {result}")
+        time.sleep(5)
+
+    # Collect all pages
+    pages = []
+    next_token = None
+    while True:
+        if next_token:
+            result = textract.get_document_text_detection(JobId=job_id, NextToken=next_token)
+        else:
+            result = textract.get_document_text_detection(JobId=job_id)
+
+        text = " ".join(
+            block["Text"]
+            for block in result["Blocks"]
+            if block["BlockType"] == "LINE"
+        )
+        pages.append(text)
+
+        next_token = result.get("NextToken")
+        if not next_token:
+            break
+
+    return " ".join(pages)
 
 
 def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
@@ -46,15 +78,6 @@ def embed_text(text):
     )
     result = json.loads(response["body"].read())
     return result["embedding"]
-
-
-def cosine_similarity(a, b):
-    dot = sum(x * y for x, y in zip(a, b))
-    mag_a = math.sqrt(sum(x ** 2 for x in a))
-    mag_b = math.sqrt(sum(x ** 2 for x in b))
-    if mag_a == 0 or mag_b == 0:
-        return 0
-    return dot / (mag_a * mag_b)
 
 
 def handler(event, context):
