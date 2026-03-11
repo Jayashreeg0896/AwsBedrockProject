@@ -51,6 +51,10 @@ Resources:
             Resource:
               - !Sub "arn:aws:s3:::bedrock-rag-documents-${AWS::AccountId}"
               - !Sub "arn:aws:s3:::bedrock-rag-documents-${AWS::AccountId}/*"
+          - Effect: Allow
+            Action:
+              - textract:DetectDocumentText
+            Resource: "*"
 
 Outputs:
   LambdaRoleArn:
