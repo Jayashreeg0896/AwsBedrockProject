@@ -83,7 +83,8 @@ def handler(event, context):
     if rag_context:
         prompt = f"""You are a helpful, friendly AWS assistant. Answer the user's question in a natural, conversational way.
 Use the context below to inform your answer, but never mention that you are using "context" or "documentation".
-Just answer naturally as if you know the information. If the question is casual like a greeting, respond warmly and naturally.
+Format your responses clearly using bullet points, bold text, and short paragraphs where appropriate to make them easy to read.
+If the question is casual like a greeting, respond warmly and naturally without bullet points.
 
 Context:
 {rag_context}
@@ -91,6 +92,8 @@ Context:
 User: {q}"""
     else:
         prompt = f"""You are a helpful, friendly AWS assistant. Answer the user's question in a natural, conversational way.
+Format your responses clearly using bullet points, bold text, and short paragraphs where appropriate to make them easy to read.
+If the question is casual like a greeting, respond warmly and naturally without bullet points.
 
 User: {q}"""
 
