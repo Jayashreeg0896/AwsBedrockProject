@@ -45,3 +45,4 @@ Outputs:
     Value: !Ref DocumentsBucket
   DocumentsBucketArn:
     Value: !GetAtt DocumentsBucket.Arn
+
