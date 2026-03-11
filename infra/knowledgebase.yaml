@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  ProjectTag: { Type: String }
+  OwnerTag: { Type: String }
+  EnvTag: { Type: String }
+
+Resources:
+
+  DocumentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "bedrock-rag-documents-${AWS::AccountId}"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Environment
+          Value: !Ref EnvTag
+
+Outputs:
+  DocumentsBucketName:
+    Value: !Ref DocumentsBucket
+  DocumentsBucketArn:
+    Value: !GetAtt DocumentsBucket.Arn

@@ -46,4 +46,6 @@ jobs:
       - name: Deploy
         run: |
           aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ImageUri=${{ secrets.ECR_REPO_URI }}:${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} OwnerTag=Jayashree EnvTag=dev SystemState=HIBERNATED ProjectTag=${{ secrets.PROJECT }}
-
+      - name: Deploy Knowledge Base Stack
+        run: |
+          aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=Jayashree EnvTag=dev
