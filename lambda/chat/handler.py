@@ -4,6 +4,7 @@ import os
 import math
 
 s3 = boto3.client("s3")
+s3_presign = boto3.client("s3", region_name="us-east-1")
 bedrock = boto3.client("bedrock-runtime")
 
 SYSTEM_STATE = os.getenv("SYSTEM_STATE", "ACTIVE")
@@ -74,38 +75,63 @@ def handler(event, context):
         return {"statusCode": 503, "body": "System parked"}
 
     body = json.loads(event.get("body", "{}"))
+
+    # Handle presign request for PDF upload
+    if body.get("action") == "presign":
+        filename = body.get("filename", "document.pdf")
+        url = s3_presign.generate_presigned_url(
+            "put_object",
+            Params={
+                "Bucket": DOCUMENTS_BUCKET,
+                "Key": filename,
+                "ContentType": "application/pdf"
+            },
+            ExpiresIn=300
+        )
+        return {
+            "statusCode": 200,
+            "body": json.dumps({"upload_url": url})
+        }
+
+    # Normal chat request
     q = body.get("question", "hello")
+    history = body.get("history", [])
 
     # Retrieve context from documents
     rag_context, sources = retrieve_context(q)
 
-    # Build prompt
+    # Build system prompt
     if rag_context:
-        prompt = f"""You are a helpful, friendly AWS assistant. Answer the user's question in a natural, conversational way.
-Use the context below to inform your answer, but never mention that you are using "context" or "documentation".
-Format your responses clearly using bullet points, bold text, and short paragraphs where appropriate to make them easy to read.
+        system_prompt = f"""You are a helpful, friendly AWS assistant. Answer questions in a natural, conversational way.
+Use the context below to inform your answers, but never mention that you are using "context" or "documentation".
+Format responses clearly using bullet points, bold text, and short paragraphs where appropriate.
 If the question is casual like a greeting, respond warmly and naturally without bullet points.
 
 Context:
-{rag_context}
-
-User: {q}"""
+{rag_context}"""
     else:
-        prompt = f"""You are a helpful, friendly AWS assistant. Answer the user's question in a natural, conversational way.
-Format your responses clearly using bullet points, bold text, and short paragraphs where appropriate to make them easy to read.
-If the question is casual like a greeting, respond warmly and naturally without bullet points.
+        system_prompt = """You are a helpful, friendly AWS assistant. Answer questions in a natural, conversational way.
+Format responses clearly using bullet points, bold text, and short paragraphs where appropriate.
+If the question is casual like a greeting, respond warmly and naturally without bullet points."""
 
-User: {q}"""
+    # Build messages with history
+    messages = []
+    for msg in history:
+        messages.append({
+            "role": msg["role"],
+            "content": [{"text": msg["text"]}]
+        })
+    # Add current question
+    messages.append({
+        "role": "user",
+        "content": [{"text": q}]
+    })
 
     # Call Claude
     response = bedrock.converse(
         modelId="anthropic.claude-3-haiku-20240307-v1:0",
-        messages=[
-            {
-                "role": "user",
-                "content": [{"text": prompt}]
-            }
-        ],
+        system=[{"text": system_prompt}],
+        messages=messages,
         inferenceConfig={"maxTokens": 1024}
     )
 
