@@ -53,4 +53,4 @@ jobs:
         run: |
           INGESTION_ARN=$(aws cloudformation describe-stacks --stack-name bedrock-agent-stack --query "Stacks[0].Outputs[?OutputKey=='IngestionFunctionArn'].OutputValue" --output text)
           echo "Ingestion ARN: $INGESTION_ARN"
-          aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} IngestionFunctionArn=$INGESTION_ARN
+          aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides IngestionFunctionArn=$INGESTION_ARN ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }}
