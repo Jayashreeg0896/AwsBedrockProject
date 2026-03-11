@@ -49,9 +49,8 @@ jobs:
       - name: Deploy App Stack
         run: aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ChatImageUri=${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }} IngestionImageUri=${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} SystemState=ACTIVE ProjectTag=${{ secrets.PROJECT }}
 
-      - name: Get Ingestion Function ARN
-        id: get_arn
-        run: echo "INGESTION_ARN=$(aws cloudformation describe-stacks --stack-name bedrock-agent-stack --query "Stacks[0].Outputs[?OutputKey=='IngestionFunctionArn'].OutputValue" --output text)" >> $GITHUB_ENV
-
       - name: Deploy Knowledge Base Stack
-        run: aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} IngestionFunctionArn=$INGESTION_ARN
+        run: |
+          INGESTION_ARN=$(aws cloudformation describe-stacks --stack-name bedrock-agent-stack --query "Stacks[0].Outputs[?OutputKey=='IngestionFunctionArn'].OutputValue" --output text)
+          echo "Ingestion ARN: $INGESTION_ARN"
+          aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} IngestionFunctionArn=$INGESTION_ARN
