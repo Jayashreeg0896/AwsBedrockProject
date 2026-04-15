@@ -46,7 +46,7 @@ jobs:
       - name: Create S3 Vectors bucket
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          aws s3vectors create-vector-bucket --vector-bucket-name bedrock-rag-vectors-$ACCOUNT_ID --region ${{ secrets.AWS_REGION }} || echo "Vector bucket already exists, skipping"
+          aws s3vectors create-vector-bucket --vector-bucket-name bedrock-rag-vectors-$ACCOUNT_ID --region ${{ secrets.AWS_REGION }} && echo "Vector bucket created" || echo "Vector bucket already exists, skipping"
 
       - name: Deploy Foundation Stack
         run: aws cloudformation deploy --stack-name bedrock-foundation --template-file infra/foundation.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }}
