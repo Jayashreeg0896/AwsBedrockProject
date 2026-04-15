@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Budget alerts for RAG chatbot project
+
+Parameters:
+  ProjectTag: { Type: String }
+  OwnerTag: { Type: String }
+  EnvTag: { Type: String }
+  AlertEmail: { Type: String }
+
+Resources:
+
+  BudgetAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: bedrock-rag-budget-alerts
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Environment
+          Value: !Ref EnvTag
+        - Key: Component
+          Value: infra
+        - Key: CostCenter
+          Value: personal-project
+
+  ProjectBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: bedrock-rag-chatbot-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 10
+          Unit: USD
+        CostFilters:
+          TagKeyValue:
+            - "user:Project$bedrock-rag-chatbot"
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 50
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlertTopic
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlertTopic
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlertTopic
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlertTopic
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+
+Outputs:
+  BudgetAlertTopicArn:
+    Value: !Ref BudgetAlertTopic
+  BudgetName:
+    Value: bedrock-rag-chatbot-monthly
