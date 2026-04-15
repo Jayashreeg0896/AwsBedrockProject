@@ -39,10 +39,31 @@ Resources:
           Value: !Ref OwnerTag
         - Key: Environment
           Value: !Ref EnvTag
+        - Key: Component
+          Value: storage
+        - Key: CostCenter
+          Value: personal-project
+
+  VectorsBucket:
+    Type: AWS::S3::VectorBucket
+    Properties:
+      VectorBucketName: !Sub "bedrock-rag-vectors-${AWS::AccountId}"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Environment
+          Value: !Ref EnvTag
+        - Key: Component
+          Value: vectors
+        - Key: CostCenter
+          Value: personal-project
 
 Outputs:
   DocumentsBucketName:
     Value: !Ref DocumentsBucket
   DocumentsBucketArn:
     Value: !GetAtt DocumentsBucket.Arn
-
+  VectorsBucketName:
+    Value: !Ref VectorsBucket

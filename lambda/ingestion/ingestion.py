@@ -1,29 +1,46 @@
 import boto3
 import json
 import os
-import math
 import time
 
 s3 = boto3.client("s3")
 bedrock = boto3.client("bedrock-runtime")
 textract = boto3.client("textract")
+s3vectors = boto3.client("s3vectors", region_name="us-east-1")
 
-BUCKET = os.getenv("DOCUMENTS_BUCKET")
-EMBEDDINGS_PREFIX = "embeddings/"
+DOCUMENTS_BUCKET = os.getenv("DOCUMENTS_BUCKET")
+VECTORS_BUCKET = os.getenv("VECTORS_BUCKET")
+INDEX_NAME = "aws-docs-index"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
 
+def create_index_if_not_exists():
+    try:
+        s3vectors.get_index(
+            vectorBucketName=VECTORS_BUCKET,
+            indexName=INDEX_NAME
+        )
+        print(f"Index {INDEX_NAME} already exists")
+    except Exception:
+        print(f"Creating index {INDEX_NAME}")
+        s3vectors.create_index(
+            vectorBucketName=VECTORS_BUCKET,
+            indexName=INDEX_NAME,
+            dataType="float32",
+            dimension=1024,
+            distanceMetric="cosine"
+        )
+        print(f"Index {INDEX_NAME} created")
+
+
 def extract_text_from_pdf(bucket, key):
-    """Extract text from multi-page PDF using Textract async API"""
-    # Start async job
     response = textract.start_document_text_detection(
         DocumentLocation={"S3Object": {"Bucket": bucket, "Name": key}}
     )
     job_id = response["JobId"]
     print(f"Textract job started: {job_id}")
 
-    # Poll until complete
     while True:
         result = textract.get_document_text_detection(JobId=job_id)
         status = result["JobStatus"]
@@ -34,7 +51,6 @@ def extract_text_from_pdf(bucket, key):
             raise Exception(f"Textract job failed: {result}")
         time.sleep(5)
 
-    # Collect all pages
     pages = []
     next_token = None
     while True:
@@ -42,14 +58,12 @@ def extract_text_from_pdf(bucket, key):
             result = textract.get_document_text_detection(JobId=job_id, NextToken=next_token)
         else:
             result = textract.get_document_text_detection(JobId=job_id)
-
         text = " ".join(
             block["Text"]
             for block in result["Blocks"]
             if block["BlockType"] == "LINE"
         )
         pages.append(text)
-
         next_token = result.get("NextToken")
         if not next_token:
             break
@@ -81,13 +95,14 @@ def embed_text(text):
 
 
 def handler(event, context):
+    create_index_if_not_exists()
+
     for record in event["Records"]:
         bucket = record["s3"]["bucket"]["name"]
         key = record["s3"]["object"]["key"]
 
-        # Skip embeddings folder and non-PDFs
-        if key.startswith(EMBEDDINGS_PREFIX) or not key.lower().endswith(".pdf"):
-            print(f"Skipping: {key}")
+        if not key.lower().endswith(".pdf"):
+            print(f"Skipping non-PDF: {key}")
             continue
 
         print(f"Processing: {key}")
@@ -100,27 +115,39 @@ def handler(event, context):
         chunks = chunk_text(text)
         print(f"Created {len(chunks)} chunks")
 
-        # Embed each chunk
-        embeddings_data = []
+        # Embed and store in S3 Vectors (max 100 per batch)
+        batch = []
         for i, chunk in enumerate(chunks):
             embedding = embed_text(chunk)
-            embeddings_data.append({
-                "chunk_id": i,
-                "source": key,
-                "text": chunk,
-                "embedding": embedding
+            batch.append({
+                "key": f"{key}-chunk-{i}",
+                "data": {"float32": embedding},
+                "metadata": {
+                    "source": key,
+                    "text": chunk,
+                    "chunk_id": str(i)
+                }
             })
             print(f"Embedded chunk {i+1}/{len(chunks)}")
 
-        # Save embeddings to S3
-        doc_name = key.replace("/", "_").replace(".pdf", "")
-        embeddings_key = f"{EMBEDDINGS_PREFIX}{doc_name}.json"
-        s3.put_object(
-            Bucket=BUCKET,
-            Key=embeddings_key,
-            Body=json.dumps(embeddings_data),
-            ContentType="application/json"
-        )
-        print(f"Saved embeddings to s3://{BUCKET}/{embeddings_key}")
+            if len(batch) == 100:
+                s3vectors.put_vectors(
+                    vectorBucketName=VECTORS_BUCKET,
+                    indexName=INDEX_NAME,
+                    vectors=batch
+                )
+                print(f"Stored batch of 100 vectors")
+                batch = []
+
+        # Store remaining batch
+        if batch:
+            s3vectors.put_vectors(
+                vectorBucketName=VECTORS_BUCKET,
+                indexName=INDEX_NAME,
+                vectors=batch
+            )
+            print(f"Stored final batch of {len(batch)} vectors")
+
+        print(f"Done: {key}")
 
     return {"statusCode": 200, "body": "Ingestion complete"}

@@ -1,15 +1,15 @@
 import boto3
 import json
 import os
-import math
 
-s3 = boto3.client("s3")
 s3_presign = boto3.client("s3", region_name="us-east-1")
 bedrock = boto3.client("bedrock-runtime")
+s3vectors = boto3.client("s3vectors", region_name="us-east-1")
 
 SYSTEM_STATE = os.getenv("SYSTEM_STATE", "ACTIVE")
 DOCUMENTS_BUCKET = os.getenv("DOCUMENTS_BUCKET")
-EMBEDDINGS_PREFIX = "embeddings/"
+VECTORS_BUCKET = os.getenv("VECTORS_BUCKET")
+INDEX_NAME = "aws-docs-index"
 TOP_K = 3
 
 
@@ -24,45 +24,28 @@ def embed_text(text):
     return result["embedding"]
 
 
-def cosine_similarity(a, b):
-    dot = sum(x * y for x, y in zip(a, b))
-    mag_a = math.sqrt(sum(x ** 2 for x in a))
-    mag_b = math.sqrt(sum(x ** 2 for x in b))
-    if mag_a == 0 or mag_b == 0:
-        return 0
-    return dot / (mag_a * mag_b)
-
-
 def retrieve_context(question):
     try:
-        response = s3.list_objects_v2(
-            Bucket=DOCUMENTS_BUCKET,
-            Prefix=EMBEDDINGS_PREFIX
-        )
-        if "Contents" not in response:
-            print("No embeddings found")
-            return "", []
-
+        # Embed the question
         question_embedding = embed_text(question)
 
-        all_chunks = []
-        for obj in response["Contents"]:
-            key = obj["Key"]
-            if not key.endswith(".json"):
-                continue
-            data = s3.get_object(Bucket=DOCUMENTS_BUCKET, Key=key)
-            chunks = json.loads(data["Body"].read())
-            all_chunks.extend(chunks)
+        # Query S3 Vectors — replaces cosine similarity loop
+        response = s3vectors.query_vectors(
+            vectorBucketName=VECTORS_BUCKET,
+            indexName=INDEX_NAME,
+            queryVector={"float32": question_embedding},
+            topK=TOP_K,
+            returnMetadata=True
+        )
 
-        scored = []
-        for chunk in all_chunks:
-            score = cosine_similarity(question_embedding, chunk["embedding"])
-            scored.append((score, chunk))
+        matches = response.get("vectors", [])
+        if not matches:
+            print("No vectors found")
+            return "", []
 
-        scored.sort(key=lambda x: x[0], reverse=True)
-        top_chunks = [chunk for _, chunk in scored[:TOP_K]]
-        sources = list(set(chunk["source"] for chunk in top_chunks))
-        context = "\n\n".join(chunk["text"] for chunk in top_chunks)
+        # Extract context and sources from metadata
+        sources = list(set(m["metadata"]["source"] for m in matches))
+        context = "\n\n".join(m["metadata"]["text"] for m in matches)
         return context, sources
 
     except Exception as e:
@@ -97,7 +80,7 @@ def handler(event, context):
     q = body.get("question", "hello")
     history = body.get("history", [])
 
-    # Retrieve context from documents
+    # Retrieve context from S3 Vectors
     rag_context, sources = retrieve_context(q)
 
     # Build system prompt
@@ -121,7 +104,6 @@ If the question is casual like a greeting, respond warmly and naturally without 
             "role": msg["role"],
             "content": [{"text": msg["text"]}]
         })
-    # Add current question
     messages.append({
         "role": "user",
         "content": [{"text": q}]

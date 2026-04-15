@@ -23,6 +23,7 @@ Resources:
         Variables:
           SYSTEM_STATE: !Ref SystemState
           DOCUMENTS_BUCKET: !Sub "bedrock-rag-documents-${AWS::AccountId}"
+          VECTORS_BUCKET: !Sub "bedrock-rag-vectors-${AWS::AccountId}"
       Tags:
         - Key: Project
           Value: !Ref ProjectTag
@@ -30,6 +31,10 @@ Resources:
           Value: !Ref OwnerTag
         - Key: Environment
           Value: !Ref EnvTag
+        - Key: Component
+          Value: chat
+        - Key: CostCenter
+          Value: personal-project
 
   IngestionFunction:
     Type: AWS::Lambda::Function
@@ -42,6 +47,7 @@ Resources:
       Environment:
         Variables:
           DOCUMENTS_BUCKET: !Sub "bedrock-rag-documents-${AWS::AccountId}"
+          VECTORS_BUCKET: !Sub "bedrock-rag-vectors-${AWS::AccountId}"
       Tags:
         - Key: Project
           Value: !Ref ProjectTag
@@ -49,6 +55,10 @@ Resources:
           Value: !Ref OwnerTag
         - Key: Environment
           Value: !Ref EnvTag
+        - Key: Component
+          Value: ingestion
+        - Key: CostCenter
+          Value: personal-project
 
   LambdaFunctionUrl:
     Type: AWS::Lambda::Url
