@@ -44,9 +44,7 @@ jobs:
         run: docker push ${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }}
 
       - name: Create S3 Vectors bucket
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          aws s3vectors create-vector-bucket --vector-bucket-name bedrock-rag-vectors-$ACCOUNT_ID --region ${{ secrets.AWS_REGION }} && echo "Vector bucket created" || echo "Vector bucket already exists, skipping"
+        run: ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) && (aws s3vectors get-vector-bucket --vector-bucket-name bedrock-rag-vectors-$ACCOUNT_ID --region ${{ secrets.AWS_REGION }} && echo "Already exists") || aws s3vectors create-vector-bucket --vector-bucket-name bedrock-rag-vectors-$ACCOUNT_ID --region ${{ secrets.AWS_REGION }}
 
       - name: Deploy Foundation Stack
         run: aws cloudformation deploy --stack-name bedrock-foundation --template-file infra/foundation.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }}
