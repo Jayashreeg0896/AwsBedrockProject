@@ -34,6 +34,19 @@ def create_index_if_not_exists():
         print(f"Index {INDEX_NAME} created")
 
 
+def vectors_exist_for_doc(key):
+    """Check if vectors already exist for this document — skip Textract if so"""
+    try:
+        response = s3vectors.get_vectors(
+            vectorBucketName=VECTORS_BUCKET,
+            indexName=INDEX_NAME,
+            keys=[f"{key}-chunk-0"]
+        )
+        return len(response.get("vectors", [])) > 0
+    except Exception:
+        return False
+
+
 def extract_text_from_pdf(bucket, key):
     response = textract.start_document_text_detection(
         DocumentLocation={"S3Object": {"Bucket": bucket, "Name": key}}
@@ -106,6 +119,11 @@ def handler(event, context):
             continue
 
         print(f"Processing: {key}")
+
+        # Skip if vectors already exist for this document
+        if vectors_exist_for_doc(key):
+            print(f"Vectors already exist for {key}, skipping Textract to save cost")
+            continue
 
         # Extract text
         text = extract_text_from_pdf(bucket, key)
