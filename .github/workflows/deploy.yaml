@@ -75,4 +75,3 @@ jobs:
 
       - name: Deploy Budget Stack
         run: aws cloudformation deploy --stack-name bedrock-rag-budget --template-file infra/budget.yaml --parameter-overrides AlertEmail=${{ secrets.ALERT_EMAIL }} ProjectTag=${{ secrets.PROJECT }} EnvTag=${{ secrets.ENV }}
-             
