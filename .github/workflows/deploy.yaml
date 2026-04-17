@@ -74,5 +74,9 @@ jobs:
           echo "ALERT_EMAIL is set: ${{ secrets.ALERT_EMAIL != '' }}"
 
       - name: Deploy Budget Stack
-        run: |
-          aws cloudformation deploy --stack-name bedrock-rag-budget --template-file infra/budget.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} AlertEmail=${{ secrets.ALERT_EMAIL }}
+        env:
+          PROJECT: ${{ secrets.PROJECT }}
+          OWNER: ${{ secrets.OWNER }}
+          ENV: ${{ secrets.ENV }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: aws cloudformation deploy --stack-name bedrock-rag-budget --template-file infra/budget.yaml --parameter-overrides ProjectTag=$PROJECT OwnerTag=$OWNER EnvTag=$ENV AlertEmail=$ALERT_EMAIL
