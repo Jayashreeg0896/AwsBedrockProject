@@ -66,5 +66,12 @@ jobs:
           echo "Ingestion ARN: $INGESTION_ARN"
           aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides IngestionFunctionArn=$INGESTION_ARN ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }}
 
+       - name: Debug Budget Params
+        run: |
+          echo "PROJECT=${{ secrets.PROJECT }}"
+          echo "OWNER=${{ secrets.OWNER }}"
+          echo "ENV=${{ secrets.ENV }}"
+          echo "ALERT_EMAIL is set: ${{ secrets.ALERT_EMAIL != '' }}"
+          
       - name: Deploy Budget Stack
         run: aws cloudformation deploy --stack-name bedrock-rag-budget --template-file infra/budget.yaml --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} AlertEmail=${{ secrets.ALERT_EMAIL }}
