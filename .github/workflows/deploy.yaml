@@ -25,8 +25,10 @@ jobs:
           PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
           echo "$PASSWORD" | docker login --username AWS --password-stdin $REGISTRY
 
+      # Lambda only accepts single-platform Docker v2 images: --provenance=false --sbom=false stops
+      # Docker from wrapping the image in an OCI index with attestations (Lambda rejects those)
       - name: Build chat image
-        run: docker build -t chatbot ./lambda/chat
+        run: docker build --provenance=false --sbom=false -t chatbot ./lambda/chat
 
       - name: Tag chat image
         run: docker tag chatbot:latest ${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }}
@@ -35,7 +37,7 @@ jobs:
         run: docker push ${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }}
 
       - name: Build ingestion image
-        run: docker build -t ingestion ./lambda/ingestion
+        run: docker build --provenance=false --sbom=false -t ingestion ./lambda/ingestion
 
       - name: Tag ingestion image
         run: docker tag ingestion:latest ${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }}
@@ -45,7 +47,7 @@ jobs:
 
       # Agentic policy assistant: built from the REPO ROOT because it copies code from langchain/
       - name: Build policy image
-        run: docker build -t policy -f lambda/policy/Dockerfile .
+        run: docker build --provenance=false --sbom=false -t policy -f lambda/policy/Dockerfile .
 
       - name: Tag policy image
         run: docker tag policy:latest ${{ secrets.ECR_REPO_URI }}:policy-${{ github.sha }}
