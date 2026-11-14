@@ -76,9 +76,8 @@ jobs:
       - name: Install ingestion dependencies
         run: pip install -r langchain/requirements-ingestion.txt
 
+      # AWS_REGION is already set (cleanly) by the "Configure AWS" step
       - name: Ingest changed policies into S3 Vectors
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           export VECTOR_BUCKET="bedrock-rag-vectors-${ACCOUNT_ID}"
