@@ -1,0 +1,30 @@
+{
+  "leave_policy.pdf": {
+    "policy_name": "Leave Policy",
+    "policy_id": "HR-POL-001",
+    "department": "HR",
+    "audience": "all",
+    "effective_date": "2026-04-01"
+  },
+  "travel_expense_policy.pdf": {
+    "policy_name": "Travel and Expense Policy",
+    "policy_id": "FIN-POL-004",
+    "department": "Finance",
+    "audience": "all",
+    "effective_date": "2026-01-01"
+  },
+  "it_security_policy.pdf": {
+    "policy_name": "IT Security Policy",
+    "policy_id": "IT-POL-002",
+    "department": "IT",
+    "audience": "all",
+    "effective_date": "2026-03-01"
+  },
+  "manager_compensation_guidelines.pdf": {
+    "policy_name": "Manager Compensation Guidelines",
+    "policy_id": "HR-CONF-010",
+    "department": "HR",
+    "audience": "managers",
+    "effective_date": "2026-04-01"
+  }
+}

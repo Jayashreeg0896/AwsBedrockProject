@@ -1,0 +1,11 @@
+﻿venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+langchain/practice/
+ingestion_manifest.json
+chroma_db/
+policy_db/
+demo_repo/
+claims_db.json
+.env

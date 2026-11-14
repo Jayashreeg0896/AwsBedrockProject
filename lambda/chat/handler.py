@@ -1,4 +1,4 @@
-import boto3
+﻿import boto3
 import json
 import os
 
@@ -29,7 +29,7 @@ def retrieve_context(question):
         # Embed the question
         question_embedding = embed_text(question)
 
-        # Query S3 Vectors — replaces cosine similarity loop
+        # Query S3 Vectors â€” replaces cosine similarity loop
         response = s3vectors.query_vectors(
             vectorBucketName=VECTORS_BUCKET,
             indexName=INDEX_NAME,
@@ -111,7 +111,7 @@ If the question is casual like a greeting, respond warmly and naturally without 
 
     # Call Claude
     response = bedrock.converse(
-        modelId="anthropic.claude-3-haiku-20240307-v1:0",
+        modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
         system=[{"text": system_prompt}],
         messages=messages,
         inferenceConfig={"maxTokens": 1024}

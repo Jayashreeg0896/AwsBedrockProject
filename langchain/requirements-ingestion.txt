@@ -1,0 +1,5 @@
+langchain-aws>=1.0,<2
+langchain-community>=0.4,<1
+langchain-text-splitters>=1.0,<2
+pypdf>=5
+boto3

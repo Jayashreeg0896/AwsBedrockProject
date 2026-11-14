@@ -43,6 +43,16 @@ jobs:
       - name: Push ingestion image
         run: docker push ${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }}
 
+      # Agentic policy assistant: built from the REPO ROOT because it copies code from langchain/
+      - name: Build policy image
+        run: docker build -t policy -f lambda/policy/Dockerfile .
+
+      - name: Tag policy image
+        run: docker tag policy:latest ${{ secrets.ECR_REPO_URI }}:policy-${{ github.sha }}
+
+      - name: Push policy image
+        run: docker push ${{ secrets.ECR_REPO_URI }}:policy-${{ github.sha }}
+
       - name: Create S3 Vectors bucket
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -54,24 +64,45 @@ jobs:
             echo "Vector bucket created"
           fi
 
+      # Policy ingestion: first run ingests every policy; later runs re-ingest ONLY
+      # policies whose PDF or metadata changed (the script compares fingerprints in S3 Vectors)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: langchain/requirements-ingestion.txt
+
+      - name: Install ingestion dependencies
+        run: pip install -r langchain/requirements-ingestion.txt
+
+      - name: Ingest changed policies into S3 Vectors
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          export VECTOR_BUCKET="bedrock-rag-vectors-${ACCOUNT_ID}"
+          python langchain/policy_ingestion.py
+
       - name: Deploy Foundation Stack
         run: aws cloudformation deploy --stack-name bedrock-foundation --template-file infra/foundation.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }}
 
       - name: Deploy App Stack
-        run: aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides SystemState=HIBERNATED ChatImageUri=${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }} IngestionImageUri=${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }} LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} ProjectTag=${{ secrets.PROJECT }}
+        run: >
+          aws cloudformation deploy --stack-name "${{ secrets.STACK_NAME }}" --template-file infra/app.yaml
+          --capabilities CAPABILITY_NAMED_IAM
+          --parameter-overrides SystemState=HIBERNATED
+          ChatImageUri=${{ secrets.ECR_REPO_URI }}:chat-${{ github.sha }}
+          IngestionImageUri=${{ secrets.ECR_REPO_URI }}:ingestion-${{ github.sha }}
+          PolicyImageUri=${{ secrets.ECR_REPO_URI }}:policy-${{ github.sha }}
+          LambdaRoleArn=${{ secrets.LAMBDA_ROLE_ARN }}
+          OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }} ProjectTag=${{ secrets.PROJECT }}
 
       - name: Deploy Knowledge Base Stack
         run: |
-          INGESTION_ARN=$(aws cloudformation describe-stacks --stack-name bedrock-agent-stack --query "Stacks[0].Outputs[?OutputKey=='IngestionFunctionArn'].OutputValue" --output text)
+          INGESTION_ARN=$(aws cloudformation describe-stacks --stack-name "${{ secrets.STACK_NAME }}" --query "Stacks[0].Outputs[?OutputKey=='IngestionFunctionArn'].OutputValue" --output text)
           echo "Ingestion ARN: $INGESTION_ARN"
           aws cloudformation deploy --stack-name bedrock-rag-knowledgebase --template-file infra/knowledgebase.yaml --parameter-overrides IngestionFunctionArn=$INGESTION_ARN ProjectTag=${{ secrets.PROJECT }} OwnerTag=${{ secrets.OWNER }} EnvTag=${{ secrets.ENV }}
-
-      - name: Debug Budget Params
-        run: |
-          echo "PROJECT=${{ secrets.PROJECT }}"
-          echo "OWNER=${{ secrets.OWNER }}"
-          echo "ENV=${{ secrets.ENV }}"
-          echo "ALERT_EMAIL is set: ${{ secrets.ALERT_EMAIL != '' }}"
 
       - name: Deploy Budget Stack
         env:

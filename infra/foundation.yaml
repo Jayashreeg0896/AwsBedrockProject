@@ -22,6 +22,13 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Environment
+          Value: !Ref EnvTag
 
   LambdaPolicy:
     Type: AWS::IAM::Policy
@@ -35,6 +42,9 @@ Resources:
           - Effect: Allow
             Action:
               - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream   # policy assistant: streaming Converse calls
+              - bedrock:Rerank                          # policy assistant: Cohere Rerank 3.5
+              - bedrock:ApplyGuardrail                  # policy assistant: Bedrock Guardrails (optional)
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
@@ -61,12 +71,19 @@ Resources:
               - s3vectors:QueryVectors
               - s3vectors:DeleteVectors
               - s3vectors:GetVectors
+              - s3vectors:ListVectors                   # semantic cache: expiry cleanup
             Resource: "*"
           - Effect: Allow
             Action:
               - textract:StartDocumentTextDetection
               - textract:GetDocumentTextDetection
             Resource: "*"
+          # Policy assistant chat history (table created in app.yaml; its name contains "PolicyHistoryTable")
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:PutItem
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*PolicyHistoryTable*"
 
 Outputs:
   LambdaRoleArn:

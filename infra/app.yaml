@@ -3,11 +3,19 @@ AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
   ChatImageUri: { Type: String }
   IngestionImageUri: { Type: String }
+  PolicyImageUri: { Type: String }
   LambdaRoleArn: { Type: String }
   ProjectTag: { Type: String }
   OwnerTag: { Type: String }
   EnvTag: { Type: String }
   SystemState: { Type: String }
+  PolicyLlmModel:
+    Type: String
+    Default: us.anthropic.claude-haiku-4-5-20251001-v1:0
+  GuardrailId:
+    Type: String
+    Default: ""
+    Description: Optional Bedrock Guardrail ID for the policy assistant
 
 Resources:
 
@@ -81,6 +89,8 @@ Resources:
       Principal: "*"
       FunctionUrlAuthType: NONE
 
+  # NOTE: Principal "*" lets ANY AWS account invoke the chat Lambda directly.
+  # The Function URL already has its own permission above, so consider removing this resource.
   LambdaInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -96,8 +106,230 @@ Resources:
       Principal: s3.amazonaws.com
       SourceArn: !Sub "arn:aws:s3:::bedrock-rag-documents-${AWS::AccountId}"
 
+  # =========================================================================
+  # Agentic policy assistant: Cognito login -> API Gateway (JWT) -> Lambda
+  # =========================================================================
+
+  # --- Users and roles (Cognito groups = employee / manager) -------------
+  PolicyUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${ProjectTag}-policy-users"
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true          # no public sign-up: users are created by an admin
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      UserPoolTags:
+        Project: !Ref ProjectTag
+        Owner: !Ref OwnerTag
+        Environment: !Ref EnvTag
+        Component: policy-assistant
+
+  PolicyUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref PolicyUserPool
+      ClientName: policy-assistant-client
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      IdTokenValidity: 60
+      AccessTokenValidity: 60
+      TokenValidityUnits:
+        IdToken: minutes
+        AccessToken: minutes
+
+  EmployeeGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: employee
+      UserPoolId: !Ref PolicyUserPool
+      Description: Can read policies with audience "all"
+
+  ManagerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: manager
+      UserPoolId: !Ref PolicyUserPool
+      Description: Can also read policies with audience "managers"
+
+  # --- Chat history (last turns per user+session, auto-deleted after 7 days)
+  PolicyHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: N
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Environment
+          Value: !Ref EnvTag
+        - Key: Component
+          Value: policy-assistant
+
+  # --- The agentic RAG Lambda ----------------------------------------------
+  PolicyFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      PackageType: Image
+      Role: !Ref LambdaRoleArn
+      Code:
+        ImageUri: !Ref PolicyImageUri
+      Timeout: 60
+      MemorySize: 1024
+      Environment:
+        Variables:
+          SYSTEM_STATE: !Ref SystemState
+          VECTOR_BUCKET: !Sub "bedrock-rag-vectors-${AWS::AccountId}"
+          HISTORY_TABLE: !Ref PolicyHistoryTable
+          LLM_MODEL: !Ref PolicyLlmModel
+          GUARDRAIL_ID: !Ref GuardrailId
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Environment
+          Value: !Ref EnvTag
+        - Key: Component
+          Value: policy-assistant
+        - Key: CostCenter
+          Value: personal-project
+
+  # --- API Gateway HTTP API with Cognito JWT authorizer ---------------------
+  PolicyApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${ProjectTag}-policy-api"
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [POST, OPTIONS]
+        AllowHeaders: [Authorization, Content-Type]
+
+  PolicyAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref PolicyApi
+      Name: cognito-jwt
+      AuthorizerType: JWT
+      IdentitySource: ["$request.header.Authorization"]
+      JwtConfiguration:
+        Issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${PolicyUserPool}"
+        Audience: [!Ref PolicyUserPoolClient]
+
+  PolicyIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref PolicyApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt PolicyFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  PolicyAskRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref PolicyApi
+      RouteKey: "POST /ask"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref PolicyAuthorizer
+      Target: !Sub "integrations/${PolicyIntegration}"
+
+  PolicyStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref PolicyApi
+      StageName: "$default"
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10          # protects your Bedrock bill
+        ThrottlingRateLimit: 5
+
+  # --- Daily cleanup of semantic-cache entries older than 7 days ------------
+  # S3 Vectors has no TTL, so a scheduled Lambda deletes expired cache vectors.
+  # Same image as PolicyFunction, different entry point.
+  CacheCleanupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      PackageType: Image
+      Role: !Ref LambdaRoleArn
+      Code:
+        ImageUri: !Ref PolicyImageUri
+      ImageConfig:
+        Command: ["cache_cleanup.lambda_handler"]
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          VECTOR_BUCKET: !Sub "bedrock-rag-vectors-${AWS::AccountId}"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Environment
+          Value: !Ref EnvTag
+        - Key: Component
+          Value: cache-cleanup
+        - Key: CostCenter
+          Value: personal-project
+
+  CacheCleanupSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Delete semantic-cache entries older than 7 days (daily)
+      ScheduleExpression: cron(30 20 * * ? *)     # 20:30 UTC = 02:00 IST, every day
+      State: ENABLED
+      Targets:
+        - Id: cache-cleanup
+          Arn: !GetAtt CacheCleanupFunction.Arn
+
+  CacheCleanupInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CacheCleanupFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CacheCleanupSchedule.Arn
+
+  PolicyApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt PolicyFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PolicyApi}/*/*/ask"
+
 Outputs:
   FunctionUrl:
     Value: !GetAtt LambdaFunctionUrl.FunctionUrl
   IngestionFunctionArn:
     Value: !GetAtt IngestionFunction.Arn
+  PolicyApiUrl:
+    Value: !Sub "https://${PolicyApi}.execute-api.${AWS::Region}.amazonaws.com/ask"
+  PolicyUserPoolId:
+    Value: !Ref PolicyUserPool
+  PolicyUserPoolClientId:
+    Value: !Ref PolicyUserPoolClient
+  PolicyHistoryTableName:
+    Value: !Ref PolicyHistoryTable
