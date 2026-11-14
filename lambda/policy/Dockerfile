@@ -1,6 +1,6 @@
 # Agentic policy assistant Lambda (container image)
 # Build from the REPO ROOT:  docker build -t policy -f lambda/policy/Dockerfile .
-FROM public.ecr.aws/lambda/python:3.11
+FROM public.ecr.aws/lambda/python:3.12
 
 # Layer 1: Python packages - cached, only rebuilt when requirements.txt changes
 COPY lambda/policy/requirements.txt ${LAMBDA_TASK_ROOT}/
